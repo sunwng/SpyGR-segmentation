@@ -9,6 +9,9 @@ import torch.optim as optim
 from torch import Tensor
 import torchvision.models as models
 
+from PIL import Image
+import torchvision.transforms as T
+
 class GRModule(nn.Module):
     def __init__(self, x, device):
         super().__init__()
@@ -23,14 +26,14 @@ class GRModule(nn.Module):
         
     def forward(self):
         x_phi_conv = self.phi_conv(self.x)
-        x_phi = x_phi_conv.view([x_phi_conv.shapep[0], -1, self.M])
+        x_phi = x_phi_conv.view([x_phi_conv.shape[0], -1, self.M])
         x_phi = self.relu(x_phi)
         x_phi_T = x_phi_conv.view([x_phi_conv.shape[0], self.M, -1])
         x_phi_T = self.relu(x_phi_T)
 
         x_glob_pool = self.glob_pool(self.x)
         x_glob_conv = self.glob_conv(x_glob_pool)
-        x_glob_diag = torch.zeros(x_glob_conv.shape[0], x_glob_conv.shape[1], x_glob_conv[1]).to(self.device)
+        x_glob_diag = torch.zeros(x_glob_conv.shape[0], x_glob_conv.shape[1], x_glob_conv.shape[1]).to(self.device)
         
         for i in range(x_glob_conv.shape[0]):
             x_glob_diag[i, :, :] = torch.diag(x_glob_conv[i, :, :, :].reshape(1, x_glob_conv.shape[1]))
@@ -48,13 +51,13 @@ class GRModule(nn.Module):
         for i in range(diag_sum.shape[0]):
             diag_sqrt = 1.0 / torch.sqrt(diag_sum[i, :])
             diag_sqrt[torch.isnan(diag_sqrt)] = 0
+            diag_sqrt[torch.isinf(diag_sqrt)] = 0
             D_sqrt_inv[i, :, :] = torch.diag(diag_sqrt)
-            
+
         I = torch.eye(D_sqrt_inv.shape[1]).to(self.device)
         I = I.repeat(D_sqrt_inv.shape[0], 1, 1)
 
         L_tilde = I - torch.matmul(torch.matmul(D_sqrt_inv, A_tilde), D_sqrt_inv)
-        
         out = torch.matmul(L_tilde, self.x.reshape(self.x.shape[0], -1, self.x.shape[1]))
         out = out.reshape(self.x.shape[0], self.x.shape[1], self.x.shape[2], self.x.shape[3])
         out = self.graph_weight(out)
@@ -116,3 +119,25 @@ class SpyGR(nn.Module):
         out = final_upsampling.forward(out)
         
         return out
+
+if __name__ == "__main__":
+    gc.collect()
+    torch.cuda.empty_cache()
+    device = torch.device("cuda")
+
+    temp = Image.open("D:/dataset/gtFine_trainvaltest/gtFine/train/aachen/aachen_000000_000019_gtFine_color.png").convert("RGB")
+    temp_tf = T.Compose([
+        T.ToTensor(),
+        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    temp_img = temp_tf(temp)
+    temp_img = torch.stack([temp_img, temp_img]).to(device)
+
+    temp_model = SpyGR(device)
+    temp_model.to(device)
+    output = temp_model.forward(temp_img)
+    print("output size: ", output.shape)
+
+    temp_tff = T.ToPILImage()
+    output = temp_tff(output[0, :, :, :])
+    output.show()
