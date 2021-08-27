@@ -33,15 +33,20 @@ class CityScapesData(Dataset):
         self.mode = mode
         self.transform = transform
         self.img_list = data_list(root_dir, quality, mode)
-        ignore_label = 255
-        self.id_to_trainid = {-1: ignore_label, 0: ignore_label, 1: ignore_label, 2: ignore_label,
-                              3: ignore_label, 4: ignore_label, 5: ignore_label, 6: ignore_label,
-                              7: 0, 8: 1, 9: ignore_label, 10: ignore_label, 11: 2, 12: 3, 13: 4,
-                              14: ignore_label, 15: ignore_label, 16: ignore_label, 17: 5,
-                              18: ignore_label, 19: 6, 20: 7, 21: 8, 22: 9, 23: 10, 24: 11, 25: 12, 26: 13, 27: 14,
-                              28: 15, 29: ignore_label, 30: ignore_label, 31: 16, 32: 17, 33: 18}
+        self.ignore_label = 255
+        self.id_to_trainid = {-1: self.ignore_label, 0: self.ignore_label, 1: self.ignore_label, 2: self.ignore_label,
+                              3: self.ignore_label, 4: self.ignore_label, 5: self.ignore_label, 6: self.ignore_label,
+                              7: 0, 8: 1, 9: self.ignore_label, 10: self.ignore_label, 11: 2, 12: 3, 13: 4,
+                              14: self.ignore_label, 15: self.ignore_label, 16: self.ignore_label, 17: 5,
+                              18: self.ignore_label, 19: 6, 20: 7, 21: 8, 22: 9, 23: 10, 24: 11, 25: 12, 26: 13, 27: 14,
+                              28: 15, 29: self.ignore_label, 30: self.ignore_label, 31: 16, 32: 17, 33: 18}
         self.void_classes = [0, 1, 2, 3, 4, 5, 6, 9, 10, 14, 15, 16, 18, 29, 30, -1]
         self.valid_classes = [7, 8, 11, 12, 13, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33]
+
+        self.class_names = ['road', 'sidewalk', 'building', 'wall', 'fence', \
+                            'pole', 'traffic_light', 'traffic_sign', 'vegetation', 'terrain', \
+                            'sky', 'person', 'rider', 'car', 'truck', 'bus', 'train', \
+                            'motorcycle', 'bicycle']
 
     def __len__(self):
         return len(self.img_list)

@@ -114,8 +114,7 @@ class SpyGR(nn.Module):
         
         out = x_gr_2 + F.interpolate(x_gr_3, scale_factor=2, mode="nearest")
         out = x_gr_1 + F.interpolate(out, scale_factor=2, mode="nearest")
-        
-        final_upsampling = upconv(512, 3, ratio=64).to(self.device)
+        final_upsampling = upconv(512, 3, ratio=32).to(self.device)
         out = final_upsampling.forward(out)
         
         return out
