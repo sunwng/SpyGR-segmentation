@@ -1,18 +1,17 @@
 import os
 
 import numpy as np
+import torch
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
-
-root_dir = ""
-class_num = []
+import torchvision.transforms as T
 
 def data_list(root, quality, mode):
     # mode : train / val / test
     if quality == "fine":
         img_dir_name = "leftImg8bit_trainvaltest"
-        label_path = os.path.join(root, "grFine_trainvaltest", "gtFine", mode)
-        label_suffix = "_gtFine_labelIds.png"
+        mask_path = os.path.join(root, "gtFine_trainvaltest", "gtFine", mode)
+        mask_suffix = "_gtFine_labelIds.png"
         img_suffix = "_leftImg8bit.png"
     img_path = os.path.join(root, img_dir_name, "leftImg8bit", mode)
 
@@ -22,16 +21,17 @@ def data_list(root, quality, mode):
     for c_idx in categories:
         c_items = [name.split(img_suffix)[0] for name in os.listdir(os.path.join(img_path, c_idx))]
         for item_idx in c_items:
-            item = (os.path.join(img_path, c_idx, item_idx+img_suffix), os.path.join(label_path, c_idx, item_idx, label_suffix))
+            item = (os.path.join(img_path, c_idx, item_idx+img_suffix), os.path.join(mask_path, c_idx, item_idx+mask_suffix))
             items.append(item)
 
     return items
 
 class CityScapesData(Dataset):
-    def __init__(self, root_dir, quality, mode, transform):
+    def __init__(self, root_dir, quality, mode, transform, crop_size):
         self.quality = quality
         self.mode = mode
         self.transform = transform
+        self.crop_size = crop_size
         self.img_list = data_list(root_dir, quality, mode)
         self.ignore_label = 255
         self.id_to_trainid = {-1: self.ignore_label, 0: self.ignore_label, 1: self.ignore_label, 2: self.ignore_label,
@@ -51,18 +51,32 @@ class CityScapesData(Dataset):
     def __len__(self):
         return len(self.img_list)
 
-    def __getitem__(self, index):
-        img_path, lab_path = self.img_list[index]
-        image = Image.open(img_path).convert("RGB")
-        label = Image.open(lab_path)
+    def random_crop(self, img, mask):
+        crop_tf = T.RandomCrop(self.crop_size)
+        img = crop_tf(img)
+        mask = crop_tf(mask)
+        # i, j, h, w = T.RandomCrop.get_params(img, output_size=self.crop_size)
+        # img = T.RandomCrop(img, i, j, h, w)
+        # mask = T.RandomCrop(mask, i, j, h, w)
+        return img, mask
 
-        label = np.array(label)
-        label_copy = label.copy()
+    def __getitem__(self, index):
+        img_path, mask_path = self.img_list[index]
+        img = Image.open(img_path).convert("RGB")
+        mask = Image.open(mask_path)
+        img, mask = self.random_crop(img, mask)
+
+        mask = np.array(mask)
+        mask_copy = mask.copy()
         for k, v in self.id_to_trainid.items():
-            label_copy[label==k] = v
-        label = Image.fromarray(label_copy.astype(np.uint8))
+            mask_copy[mask==k] = v
+        # label = Image.fromarray(label_copy.astype(np.uint8))
+        # label = np.array(label, dtype=np.float32)
+        # label = torch.from_numpy(np.array(label_copy, dtype=np.int32)).long()
 
         if self.transform is not None:
-            image = self.transform(image)
+            img = self.transform(img)
         
-        return image, label
+        mask = torch.from_numpy(np.array(mask_copy, dtype=np.int32)).long()
+        
+        return img, mask

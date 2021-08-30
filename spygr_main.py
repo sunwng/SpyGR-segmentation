@@ -15,13 +15,14 @@ import torchvision.transforms as T
 from PIL import Image
 import tqdm
 
-import spygr
+from spygr import *
 from spygr_dataloader import *
+
+from torch.backends import cudnn
 
 device = torch.device("cuda")
 
-
-def evaluate_model(val_dataloader: CityScapesData, model: spygr, criterion):
+def evaluate_model(val_dataloader: CityScapesData, model: SpyGR, criterion):
 
     eval_iou_score = 0
     eval_loss = 0
@@ -75,13 +76,13 @@ def main():
         T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
-    root_dir = "D:/dataset" ###
+    root_dir = "D:/dataset" ### Directory of dataset
 
-    train_set = CityScapesData(root_dir, "fine", "train", transforms_train)
-    valid_set = CityScapesData(root_dir, "fine", "val", transforms_val)
-    test_set = CityScapesData(root_dir, "fine", "test", transforms_test)
+    train_set = CityScapesData(root_dir, "fine", "train", transforms_train, (768,768))
+    valid_set = CityScapesData(root_dir, "fine", "val", transforms_val, (768,768))
+    test_set = CityScapesData(root_dir, "fine", "test", transforms_test, (768,768))
 
-    train_batch_size = 256  # Control by YAML
+    train_batch_size = 16  # Control by YAML
     valid_batch_size = 64  # Control by YAML
     test_batch_size = 32  # Control by YAML
 
@@ -91,9 +92,9 @@ def main():
 
     # device = torch.device("cuda")
 
-    model = spygr(device).to(device)
+    model = SpyGR(device).to(device)
 
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)  # Control by YAML
+    optimizer = optim.Adam(model.parameters(), lr=1e-4)  # Control by YAML
     criterion = nn.CrossEntropyLoss(ignore_index=train_set.ignore_label).cuda()
 
     num_epochs = 80  # Control by YAML
@@ -132,14 +133,13 @@ def main():
                           "optimizer": optimizer.state_dict()}
 
             torch.save(checkpoint, os.path.join(
-                "dir", "model_name", "-{:07d}.pth".format(global_step)))
+                "D:/model", "spygr", "-{:07d}.pth".format(global_step)))
 
         eval_loss, eval_iou_score = evaluate_model(valid_loader, model, criterion)
         print("Epoch: {}/{} | validation average loss: {:.5f} | evaluation mIoU: {:.5f}".format(epoch, num_epochs, eval_loss/len(valid_loader, eval_iou_score/len(valid_loader))))
         model.train()
 
         global_step += 1
-
 
 if __name__ == "__main__":
     main()

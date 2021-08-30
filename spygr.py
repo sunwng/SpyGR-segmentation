@@ -53,12 +53,14 @@ class GRModule(nn.Module):
             diag_sqrt[torch.isnan(diag_sqrt)] = 0
             diag_sqrt[torch.isinf(diag_sqrt)] = 0
             D_sqrt_inv[i, :, :] = torch.diag(diag_sqrt)
-
+        print("NaN Check(D_sqrt_inv): ", torch.isnan(D_sqrt_inv).any())
         I = torch.eye(D_sqrt_inv.shape[1]).to(self.device)
         I = I.repeat(D_sqrt_inv.shape[0], 1, 1)
 
         L_tilde = I - torch.matmul(torch.matmul(D_sqrt_inv, A_tilde), D_sqrt_inv)
+        print("NaN Check(L_tilde): ", torch.isnan(L_tilde).any())
         out = torch.matmul(L_tilde, self.x.reshape(self.x.shape[0], -1, self.x.shape[1]))
+        print("NaN Check(out): ", torch.isnan(out).any())
         out = out.reshape(self.x.shape[0], self.x.shape[1], self.x.shape[2], self.x.shape[3])
         out = self.graph_weight(out)
         out = self.relu(out)
@@ -80,9 +82,10 @@ class upconv(nn.Module):
         return out
     
 class SpyGR(nn.Module):
-    def __init__(self, device):
+    def __init__(self, device, num_class=19):
         super().__init__()
         self.device = device
+        self.num_class = num_class
         self.pretrained_resnet = models.resnet50(pretrained=True).to(self.device)
 
         for param in self.pretrained_resnet.parameters():
@@ -90,7 +93,9 @@ class SpyGR(nn.Module):
         
         self.reduce_dim = nn.Conv2d(2048, 512, kernel_size=3, stride=1, padding=1, bias=False)
         self.down_samp = nn.MaxPool2d(kernel_size=2, stride=2, padding=0)
-    
+        self.classification = nn.Conv2d(512, self.num_class, kernel_size=1, padding=0)
+        self.relu = nn.ReLU()
+
     def forward(self, x):
         x = self.pretrained_resnet.conv1(x)
         x = self.pretrained_resnet.bn1(x)
@@ -101,7 +106,7 @@ class SpyGR(nn.Module):
         x = self.pretrained_resnet.layer3(x)
         x = self.pretrained_resnet.layer4(x)
         x = self.reduce_dim(x)
-        
+        x = self.relu(x)
         GR_1 = GRModule(x, self.device).to(self.device)
         x = self.down_samp(x)
         GR_2 = GRModule(x, self.device).to(self.device)
@@ -109,12 +114,16 @@ class SpyGR(nn.Module):
         GR_3 = GRModule(x, self.device).to(self.device)
 
         x_gr_1 = GR_1.forward()
+        x_gr_1 = self.relu(x_gr_1)
         x_gr_2 = GR_2.forward()
+        x_gr_2 = self.relu(x_gr_2)
         x_gr_3 = GR_3.forward()
-        
+        x_gr_3 = self.relu(x_gr_3)
+
         out = x_gr_2 + F.interpolate(x_gr_3, scale_factor=2, mode="nearest")
         out = x_gr_1 + F.interpolate(out, scale_factor=2, mode="nearest")
-        final_upsampling = upconv(512, 3, ratio=32).to(self.device)
+        out = self.classification(out)
+        final_upsampling = upconv(self.num_class, self.num_class, ratio=32).to(self.device)
         out = final_upsampling.forward(out)
         
         return out
