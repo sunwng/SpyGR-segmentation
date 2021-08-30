@@ -53,14 +53,11 @@ class GRModule(nn.Module):
             diag_sqrt[torch.isnan(diag_sqrt)] = 0
             diag_sqrt[torch.isinf(diag_sqrt)] = 0
             D_sqrt_inv[i, :, :] = torch.diag(diag_sqrt)
-        print("NaN Check(D_sqrt_inv): ", torch.isnan(D_sqrt_inv).any())
         I = torch.eye(D_sqrt_inv.shape[1]).to(self.device)
         I = I.repeat(D_sqrt_inv.shape[0], 1, 1)
 
         L_tilde = I - torch.matmul(torch.matmul(D_sqrt_inv, A_tilde), D_sqrt_inv)
-        print("NaN Check(L_tilde): ", torch.isnan(L_tilde).any())
         out = torch.matmul(L_tilde, self.x.reshape(self.x.shape[0], -1, self.x.shape[1]))
-        print("NaN Check(out): ", torch.isnan(out).any())
         out = out.reshape(self.x.shape[0], self.x.shape[1], self.x.shape[2], self.x.shape[3])
         out = self.graph_weight(out)
         out = self.relu(out)
