@@ -13,7 +13,7 @@ from torch.backends import cudnn
 import torchvision.models as models
 import torchvision.transforms as T
 from PIL import Image
-import tqdm
+from tqdm import tqdm
 
 from spygr import *
 from spygr_dataloader import *
@@ -22,15 +22,15 @@ from torch.backends import cudnn
 
 device = torch.device("cuda")
 
-def evaluate_model(val_dataloader: CityScapesData, model: SpyGR, criterion):
+def evaluate_model(val_dataloader, model: SpyGR, criterion):
 
     eval_iou_score = 0
     eval_loss = 0
 
-    for sample_set in tqdm(val_dataloader):
+    for images, masks in tqdm(val_dataloader):
         with torch.no_grad():
-            eval_images = sample_set["image"].to(device)
-            eval_labels = sample_set["lable"].to(device)
+            eval_images = images.to(device)
+            eval_labels = masks.to(device)
 
             eval_outputs = model(eval_images)
             model.eval()
@@ -135,11 +135,11 @@ def main():
             torch.save(checkpoint, os.path.join(
                 "D:/model", "spygr", "-{:07d}.pth".format(global_step)))
 
+            global_step += 1
+
         eval_loss, eval_iou_score = evaluate_model(valid_loader, model, criterion)
         print("Epoch: {}/{} | validation average loss: {:.5f} | evaluation mIoU: {:.5f}".format(epoch, num_epochs, eval_loss/len(valid_loader, eval_iou_score/len(valid_loader))))
         model.train()
-
-        global_step += 1
 
 if __name__ == "__main__":
     main()
